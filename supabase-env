@@ -1,0 +1,59 @@
+#!/bin/bash
+
+function _supabase_env() {
+  profile="${SUPABASE_PROFILE}"
+  [[ $# -ge 1 ]] && profile="${1}"
+  [[ -z "${profile}" ]] && echo "Supabase unconfigured - didn't get a profile name as argument or as env \$AWS_PROFILE" && return
+  if [[ $# -le 0 ]] && command -v fzf
+    then
+      profiles="$(_supabase_list | fzf --prompt "profiles: " -m | tr -d '[],')"
+      _supabase_unset
+      echo "Loading Supabase profile $profiles"
+      export SUPABASE_PROFILE=$profiles
+      _supabase_set_env
+  else
+    _supabase_unset
+    echo "Loading Supabase profile $profile"
+    export SUPABASE_PROFILE=$profile
+    _supabase_set_env
+  fi
+}
+
+function _supabase_unset() {
+  unset SUPABASE_PROFILE
+  unset SUPABASE_URL
+  unset SUPABASE_KEY
+}
+
+function _supabase_set_env() {
+  credentialFile="${SUPABASE_CREDENTIAL_FILE:-'~/.supabase/credentials'}"
+
+  credentials="$(grep ${SUPABASE_PROFILE} -A2 < $credentialFile | grep -v ${SUPABASE_PROFILE})"
+
+  while IFS= read -r line; do
+      export $line
+  done <<< "$credentials"
+
+}
+
+function _supabase_list() {
+  credentialFile="${SUPABASE_CREDENTIAL_FILE:-'~/.supabase/credentials'}"
+
+  while read line; do
+      if [[ $line == "["* ]]
+        then 
+          echo "$line" | sed 's/profile //g' # In case you need this to work with the ~/.aws/config and SSO 
+      fi
+  done < $credentialFile;
+};
+
+function _supabase_who() {
+    echo $SUPABASE_PROFILE
+}
+
+alias supabase-switch="_supabase_env"
+alias supabase-unset="_supabase_unset"
+alias supabase-list="_supabase_list"
+alias supabase-who="_supabase_who"
+
+supabase-switch
